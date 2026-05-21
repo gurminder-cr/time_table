@@ -1,0 +1,193 @@
+
+<h2 class="sr-only">5-day timetable with 5-min breaks, classes spread Mon to Fri, one free lecture per trainer on Friday. Naina: 3,4,9,10. Renuka: 5,6,7,8.</h2>
+<style>
+*{box-sizing:border-box}
+.wrap{padding:.5rem 0;font-size:12px}
+.top-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ap{font-size:11px;padding:4px 10px;border-radius:var(--border-radius-md);font-weight:500}
+.ap-n{background:#E6F1FB;color:#0C447C;border:.5px solid #378ADD}
+.ap-r{background:#EAF3DE;color:#27500A;border:.5px solid #639922}
+.ap-f{background:#FBEAF0;color:#72243E;border:.5px solid #D4537E}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.ctrls select{font-size:12px}
+.leg{display:flex;gap:14px;font-size:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.dot{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:3px;vertical-align:middle}
+.tbl-wrap{overflow-x:auto;border-radius:var(--border-radius-lg);border:.5px solid var(--color-border-tertiary)}
+table{border-collapse:collapse;width:100%;min-width:570px;table-layout:fixed}
+th,td{border:.5px solid var(--color-border-tertiary);text-align:center;padding:0;vertical-align:middle}
+th{background:var(--color-background-secondary);font-weight:500;font-size:11px;color:var(--color-text-secondary);padding:5px 3px}
+th.dh{font-size:12px;color:var(--color-text-primary)}
+th.fri{color:#185FA5}
+.tc{font-size:10px;color:var(--color-text-secondary);padding:3px 4px;white-space:nowrap;background:var(--color-background-secondary);width:74px}
+.pc{padding:0;height:46px}
+.half{height:23px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;gap:3px;padding:0 3px}
+.half:first-child{border-bottom:.5px solid rgba(0,0,0,.07)}
+.hn{background:#E6F1FB;color:#0C447C}
+.hr{background:#EAF3DE;color:#27500A}
+.hf{background:#FBEAF0;color:#72243E}
+.he{background:var(--color-background-secondary);color:var(--color-text-tertiary)}
+.brow td{background:var(--color-background-tertiary);color:var(--color-text-tertiary);font-size:9px;padding:2px 0;border-color:var(--color-border-tertiary);height:17px}
+.btc{font-size:9px;color:var(--color-text-tertiary);padding:2px 3px;background:var(--color-background-secondary);text-align:center}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.sc{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 12px;min-width:105px}
+.sv{font-size:17px;font-weight:500;color:var(--color-text-primary);display:block}
+.sl{font-size:11px;color:var(--color-text-secondary)}
+</style>
+
+<div class="wrap">
+<div class="top-bar">
+  <span class="ap ap-n">Naina — Cl. 3, 4, 9, 10</span>
+  <span class="ap ap-r">Renuka — Cl. 5, 6, 7, 8</span>
+  <span class="ap ap-f">1 free lecture each on Friday</span>
+</div>
+<div class="ctrls">
+  <label style="font-size:12px;color:var(--color-text-secondary)">Class:</label>
+  <select id="cf"><option value="all">All classes</option></select>
+  <label style="font-size:12px;color:var(--color-text-secondary)">Section:</label>
+  <select id="sf"><option value="all">All sections</option><option>S</option><option>D</option><option>R</option></select>
+  <label style="font-size:12px;color:var(--color-text-secondary)">Trainer:</label>
+  <select id="tf"><option value="all">Both</option><option>Naina</option><option>Renuka</option></select>
+</div>
+<div class="leg">
+  <span><span class="dot" style="background:#B5D4F4;border:.5px solid #378ADD"></span>Naina</span>
+  <span><span class="dot" style="background:#C0DD97;border:.5px solid #639922"></span>Renuka</span>
+  <span><span class="dot" style="background:#F4C0D1;border:.5px solid #D4537E"></span>Free lecture</span>
+  <span style="font-size:11px;color:var(--color-text-secondary)">40 min + 5 min break each slot</span>
+</div>
+<div class="tbl-wrap"><table id="tt"></table></div>
+<div class="stats" id="st"></div>
+</div>
+
+<script>
+const DAYS=['Mon','Tue','Wed','Thu','Fri'];
+const NCLS=[3,4,9,10], RCLS=[5,6,7,8], SECS=['S','D','R'];
+
+function mkSlots(){
+  const s=[];let m=540;
+  while(m+40<=840){
+    const f=x=>`${Math.floor(x/60)}:${String(x%60).padStart(2,'0')}`;
+    s.push({lbl:`${f(m)}–${f(m+40)}`,blbl:`${f(m+40)}–${f(m+45)}`});
+    m+=45;
+  }
+  return s;
+}
+const SL=mkSlots(), NS=SL.length;
+
+function build(){
+  const tt=Array.from({length:5},()=>Array.from({length:NS},()=>({n:null,r:null})));
+  function makeCS(cls,tr){
+    const a=[];cls.forEach(c=>SECS.forEach(s=>a.push({cls:c,sec:s,tr})));return a;
+  }
+  const np=makeCS(NCLS,'Naina'), rp=makeCS(RCLS,'Renuka');
+  const need={};
+  [...np,...rp].forEach(x=>{need[x.tr+x.cls+x.sec]=2;});
+  const used=new Set();
+
+  function pick(pool,tr,day){
+    for(let i=0;i<pool.length;i++){
+      const x=pool[i],k=tr+x.cls+x.sec;
+      if(need[k]<=0) continue;
+      const dk=k+'d'+day;
+      if(used.has(dk)) continue;
+      used.add(dk);need[k]--;
+      return {...x};
+    }
+    return null;
+  }
+
+  // Distribute: 24 sessions each across 5 days = 5,5,5,5,4
+  // Keep last slot of Friday free for free lecture
+  const nTarget=[5,5,5,5,4], rTarget=[5,5,5,5,4];
+  const nDay=[0,0,0,0,0], rDay=[0,0,0,0,0];
+
+  for(let d=0;d<5;d++){
+    for(let s=0;s<NS;s++){
+      if(nDay[d]<nTarget[d]){const x=pick(np,'Naina',d);if(x){tt[d][s].n=x;nDay[d]++;}}
+      if(rDay[d]<rTarget[d]){const x=pick(rp,'Renuka',d);if(x){tt[d][s].r=x;rDay[d]++;}}
+    }
+  }
+  // safety fill remaining
+  for(let d=0;d<5;d++) for(let s=0;s<NS;s++){
+    if(!tt[d][s].n){const x=pick(np,'Naina',d);if(x){tt[d][s].n=x;}}
+    if(!tt[d][s].r){const x=pick(rp,'Renuka',d);if(x){tt[d][s].r=x;}}
+  }
+
+  // Place free lecture: find last empty slot on Friday for each trainer
+  let nf=false,rf=false;
+  for(let s=NS-1;s>=0;s--){
+    if(!nf&&!tt[4][s].n){tt[4][s].n={cls:'Free',sec:'',tr:'Naina',free:true};nf=true;}
+    if(!rf&&!tt[4][s].r){tt[4][s].r={cls:'Free',sec:'',tr:'Renuka',free:true};rf=true;}
+    if(nf&&rf)break;
+  }
+  if(!nf){tt[4][NS-1].n={cls:'Free',sec:'',tr:'Naina',free:true};}
+  if(!rf){tt[4][NS-1].r={cls:'Free',sec:'',tr:'Renuka',free:true};}
+
+  return tt;
+}
+
+const tt=build();
+
+const cfEl=document.getElementById('cf');
+[...NCLS,...RCLS].sort((a,b)=>a-b).forEach(c=>{
+  const o=document.createElement('option');o.value=c;o.textContent='Class '+c;cfEl.appendChild(o);
+});
+
+function ok(e,cf,sf,tf){
+  if(!e)return false;
+  if(e.free){return tf==='all'||tf===e.tr;}
+  if(cf!=='all'&&e.cls!=cf)return false;
+  if(sf!=='all'&&e.sec!==sf)return false;
+  if(tf!=='all'&&e.tr!==tf)return false;
+  return true;
+}
+
+function div(e,cf,sf,tf){
+  if(!e||!ok(e,cf,sf,tf))return`<div class="half he">—</div>`;
+  if(e.free)return`<div class="half hf"><span>Free lecture</span>&nbsp;<span style="opacity:.7">${e.tr.slice(0,5)}</span></div>`;
+  const c=e.tr==='Naina'?'hn':'hr';
+  return`<div class="half ${c}"><span>Cl.${e.cls}-${e.sec}</span>&nbsp;<span style="opacity:.7">${e.tr.slice(0,5)}</span></div>`;
+}
+
+function render(){
+  const cf=cfEl.value,sf=document.getElementById('sf').value,tf=document.getElementById('tf').value;
+  const tbl=document.getElementById('tt');tbl.innerHTML='';
+
+  const hr=document.createElement('tr');
+  const h0=document.createElement('th');h0.textContent='Time';h0.style.width='74px';hr.appendChild(h0);
+  DAYS.forEach((d,i)=>{
+    const th=document.createElement('th');th.className='dh'+(i===4?' fri':'');th.textContent=d;hr.appendChild(th);
+  });
+  tbl.appendChild(hr);
+
+  SL.forEach((sl,si)=>{
+    const tr=document.createElement('tr');
+    const td0=document.createElement('td');td0.className='tc';td0.textContent=sl.lbl;tr.appendChild(td0);
+    DAYS.forEach((_,di)=>{
+      const td=document.createElement('td');td.className='pc';
+      td.innerHTML=div(tt[di][si].n,cf,sf,tf)+div(tt[di][si].r,cf,sf,tf);
+      tr.appendChild(td);
+    });
+    tbl.appendChild(tr);
+    const br=document.createElement('tr');br.className='brow';
+    const bt=document.createElement('td');bt.className='btc';bt.textContent=sl.blbl;br.appendChild(bt);
+    DAYS.forEach(()=>{const bd=document.createElement('td');bd.textContent='5 min break';br.appendChild(bd);});
+    tbl.appendChild(br);
+  });
+
+  let nC=0,rC=0;
+  for(let d=0;d<5;d++)for(let s=0;s<NS;s++){
+    const sl=tt[d][s];
+    if(sl.n&&!sl.n.free)nC++;
+    if(sl.r&&!sl.r.free)rC++;
+  }
+  document.getElementById('st').innerHTML=`
+    <div class="sc"><span class="sv">${nC+rC}</span><span class="sl">Class sessions/week</span></div>
+    <div class="sc"><span class="sv">${nC}</span><span class="sl">Naina's classes</span></div>
+    <div class="sc"><span class="sv">${rC}</span><span class="sl">Renuka's classes</span></div>
+    <div class="sc"><span class="sv">1 each</span><span class="sl">Free lecture (Fri)</span></div>
+    <div class="sc"><span class="sv">Mon–Fri</span><span class="sl">All 5 days active</span></div>
+  `;
+}
+['cf','sf','tf'].forEach(id=>document.getElementById(id).addEventListener('change',render));
+render();
+</script>
